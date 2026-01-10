@@ -69,7 +69,12 @@ class CustomIcon:
     REPORT = f"{ICONS_DIR}/report.png"
     CROP_SQUARE = f"{ICONS_DIR}/crop_square.png"
     STORAGE = f"{ICONS_DIR}/storage.png"
-    
+
+    # Logos
+    LOGO_DOAN = f"{ICONS_DIR}/logo_doan.png"
+    LOGO_HOI = f"{ICONS_DIR}/logo_hoi.png"
+    LOGO_TRUONG = f"{ICONS_DIR}/logo_truong.png"
+
     @staticmethod
     def create(icon_path: str, size: int = 20, color: str = None):
         return ft.Image(

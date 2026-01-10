@@ -4,7 +4,7 @@ import asyncio
 import os
 import sys
 
-CURRENT_VERSION = "1.7.0"
+CURRENT_VERSION = "1.8.0"
 GITHUB_REPO = "https://github.com/QuangAnh253/App-Doan-Hoi"
 
 try:

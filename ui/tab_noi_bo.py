@@ -2484,11 +2484,11 @@ def NoiBoTab(page: ft.Page, role: str):
         
         def prev_week():
             state["current_week_offset"] -= 1
-            load_week_view()
+            page.run_task(load_week_view)
         
         def next_week():
             state["current_week_offset"] += 1
-            load_week_view()
+            page.run_task(load_week_view)
         
         # ===================== SELECTION =====================
         def toggle_selection(id: str, selected: bool):
@@ -3073,15 +3073,15 @@ def NoiBoTab(page: ft.Page, role: str):
             )
         
         card_bch_hoi = create_overview_card(
-            "BCH Hội SV", "... / 20", 20, CustomIcon.BADGE, ft.Colors.BLUE_50
+            "BCH Hội SV", "... / 20", 20, CustomIcon.LOGO_HOI, ft.Colors.BLUE_50
         )
         
         card_bch_doan = create_overview_card(
-            "BCH Đoàn", "... / 9", 9, CustomIcon.PEOPLE, ft.Colors.GREEN_50
+            "BCH Đoàn", "... / 9", 9, CustomIcon.LOGO_DOAN, ft.Colors.GREEN_50
         )
         
         card_ban_vp = create_overview_card(
-            "Ban Văn phòng", "... / 26", 26, CustomIcon.WORK, ft.Colors.ORANGE_50
+            "Ban Văn phòng", "... / 26", 26, CustomIcon.LOGO_HOI, ft.Colors.ORANGE_50
         )
         
         # ===================== WEEKLY TABLE =====================
@@ -3125,7 +3125,7 @@ def NoiBoTab(page: ft.Page, role: str):
                 controls=[
                     ft.ProgressRing(width=50, height=50, color=ft.Colors.BLUE_700),
                     ft.Container(height=12),
-                    ft.Text("📊 Đang tải...", size=14, color=ft.Colors.BLUE_700),
+                    ft.Text("Đang tải...", size=14, color=ft.Colors.BLUE_700),
                 ],
             ),
             expand=True,
@@ -3215,12 +3215,15 @@ def NoiBoTab(page: ft.Page, role: str):
                         if not ho_ten:
                             continue
                         
-                        # ✅ Normalize để group đúng
+                        trang_thai = lt.get('trang_thai', '')
+                        if trang_thai not in ['Đã đăng ký', 'Đã trực']:
+                            continue
+                        
                         normalized = normalize_name(ho_ten)
                         
                         if normalized not in stats:
                             stats[normalized] = {
-                                'ho_ten_display': ho_ten,  # Dùng tên từ lịch trực
+                                'ho_ten_display': ho_ten,
                                 'so_buoi': 0,
                                 'loai_can_bo': [],
                                 'chuc_vu': [],

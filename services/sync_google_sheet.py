@@ -1,4 +1,3 @@
-# services/sync_google_sheet.py
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from core.supabase_client import supabase
@@ -12,9 +11,12 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 CREDENTIALS_FILE = 'credentials.json'
 SHEET_ID = '1nnFBZkEYtnhvQuiKDr94__hRNaNIb3JsAXyFqJTl8WE'
 
-# Cấu trúc: Cột B=Thứ 2, C=Thứ 3, D=Thứ 4, E=Thứ 5, F=Thứ 6
-RANGE_SANG = 'B6:F14'
-RANGE_CHIEU = 'B17:F25'
+SHEET_NAME = 'Lịch làm việc'
+
+RANGE_HEADER = f"'{SHEET_NAME}'!B3:F3"
+RANGE_DATES = f"'{SHEET_NAME}'!B4:F4"
+RANGE_SANG = f"'{SHEET_NAME}'!B6:F14"
+RANGE_CHIEU = f"'{SHEET_NAME}'!B17:F25"
 
 
 def parse_cell_value(raw_value: str) -> Tuple[str, Optional[str], bool]:
@@ -83,25 +85,26 @@ def find_can_bo_by_name(ho_ten: str) -> Optional[str]:
     return None
 
 
-def get_cell_address(col_idx: int, row_idx: int, ca_truc: str) -> str:
-    col_letter = chr(ord('C') + col_idx)
+def parse_date_from_sheet(date_str: str, year: int = None) -> Optional[datetime]:
+    if not date_str or not isinstance(date_str, str):
+        return None
     
-    if ca_truc == 'Sáng':
-        row_number = 5 + row_idx
-    else:
-        row_number = 11 + row_idx
+    date_str = date_str.strip()
     
-    return f"{col_letter}{row_number}"
-
-
-def get_monday_of_week(date: datetime = None) -> datetime:
-    if date is None:
-        date = datetime.now()
+    match = re.match(r'(\d{1,2})/(\d{1,2})', date_str)
+    if not match:
+        return None
     
-    days_since_monday = date.weekday()
-    monday = date - timedelta(days=days_since_monday)
+    day = int(match.group(1))
+    month = int(match.group(2))
     
-    return monday.replace(hour=0, minute=0, second=0, microsecond=0)
+    if year is None:
+        year = datetime.now().year
+    
+    try:
+        return datetime(year, month, day)
+    except ValueError:
+        return None
 
 
 @retry_patient
@@ -109,7 +112,7 @@ def sync_one_range(
     service,
     range_name: str,
     ca_truc: str,
-    week_start: datetime
+    dates: List[datetime]
 ) -> Tuple[int, int, List[str]]:
     try:
         result = service.spreadsheets().values().get(
@@ -125,29 +128,32 @@ def sync_one_range(
         
         print(f"\n=== Sync {ca_truc} ===")
         print(f"Số hàng: {len(values)}")
-        print(f"Tuần bắt đầu: {week_start.date()}")
+        print(f"Ngày: {[d.strftime('%d/%m/%Y') for d in dates]}")
         
         for row_idx, row in enumerate(values):
-            
-            for col_idx, cell_value in enumerate(row):
-                
-                if col_idx > 4:
-                    continue
-
-                ngay_truc = week_start + timedelta(days=col_idx)
+            for col_idx in range(min(len(row), 5)):
+                cell_value = row[col_idx] if col_idx < len(row) else ""
                 
                 if not cell_value or str(cell_value).strip() == "":
                     continue
                 
-                cell_addr = get_cell_address(col_idx, row_idx, ca_truc)
+                if col_idx >= len(dates):
+                    continue
+                
+                ngay_truc = dates[col_idx]
+                
+                col_letter = chr(ord('B') + col_idx)
+                row_number = int(range_name.split('!')[1].split(':')[0][1:]) + row_idx
+                cell_addr = f"{col_letter}{row_number}"
+                
                 cell_str_val = str(cell_value)
                 
-                print(f"\n Cell {cell_addr} ({ngay_truc.strftime('%d/%m/%Y')}): '{cell_str_val}'")
+                print(f"\n  Cell {cell_addr} ({ngay_truc.strftime('%d/%m/%Y')}): '{cell_str_val}'")
                 
                 try:
                     ho_ten, sdt, is_valid = parse_cell_value(cell_str_val)
                     
-                    print(f"  → Parsed: tên='{ho_ten}', sđt='{sdt}', valid={is_valid}")
+                    print(f"    → Parsed: tên='{ho_ten}', sđt='{sdt}', valid={is_valid}")
                     
                     if not is_valid or not ho_ten:
                         error_msg = f"Parse thất bại hoặc không có tên"
@@ -159,9 +165,9 @@ def sync_one_range(
                     can_bo_id = find_can_bo_by_name(ho_ten)
                     
                     if can_bo_id:
-                        print(f"Tìm thấy cán bộ ID: {can_bo_id}")
+                        print(f" Tìm thấy cán bộ ID: {can_bo_id}")
                     else:
-                        print(f"Không tìm thấy cán bộ trong DB")
+                        print(f" Không tìm thấy cán bộ trong DB")
                     
                     existing = supabase.table('lich_truc')\
                         .select('id, trang_thai')\
@@ -218,38 +224,57 @@ def sync_one_range(
 
 
 @retry_patient
-def sync_full_week(week_start: datetime = None) -> Dict:
+def sync_full_week() -> Dict:
     start_time = datetime.now()
     
-    if week_start is None:
-        week_start = get_monday_of_week()
-    
     print(f"\n{'='*60}")
-    print(f"BẮT ĐẦU ĐỒNG BỘ TUẦN {week_start.date()}")
+    print(f"BẮT ĐẦU ĐỒNG BỘ TUẦN")
     print(f"{'='*60}")
     
     try:
-        # Khởi tạo Google Sheets API
         creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
         service = build('sheets', 'v4', credentials=creds)
         
+        print(f"\nĐọc ngày từ sheet...")
+        date_result = service.spreadsheets().values().get(
+            spreadsheetId=SHEET_ID,
+            range=RANGE_DATES
+        ).execute()
+        
+        date_values = date_result.get('values', [[]])[0] if date_result.get('values') else []
+        
+        dates = []
+        current_year = datetime.now().year
+        
+        for date_str in date_values[:5]:
+            parsed_date = parse_date_from_sheet(str(date_str), current_year)
+            if parsed_date:
+                dates.append(parsed_date)
+            else:
+                print(f"Không parse được ngày: '{date_str}'")
+        
+        if len(dates) != 5:
+            raise ValueError(f"Không đủ 5 ngày hợp lệ. Chỉ parse được {len(dates)} ngày: {date_values[:5]}")
+        
+        print(f"Đã parse 5 ngày:")
+        for i, d in enumerate(dates):
+            weekday = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"][d.weekday()]
+            print(f"  - {weekday}: {d.strftime('%d/%m/%Y')}")
+        
         all_errors = []
         
-        # 1. Sync Ca Sáng (C5:G9)
         print(f"\nĐang sync ca SÁNG...")
         success_sang, error_sang, errors_sang = sync_one_range(
-            service, RANGE_SANG, "Sáng", week_start
+            service, RANGE_SANG, "Sáng", dates
         )
         all_errors.extend([f"[Sáng] {e}" for e in errors_sang])
         
-        # 2. Sync Ca Chiều (C11:G15)
         print(f"\nĐang sync ca CHIỀU...")
         success_chieu, error_chieu, errors_chieu = sync_one_range(
-            service, RANGE_CHIEU, "Chiều", week_start
+            service, RANGE_CHIEU, "Chiều", dates
         )
         all_errors.extend([f"[Chiều] {e}" for e in errors_chieu])
         
-        # Tính toán tổng kết
         total_success = success_sang + success_chieu
         total_errors = error_sang + error_chieu
         duration = (datetime.now() - start_time).total_seconds()
@@ -261,11 +286,12 @@ def sync_full_week(week_start: datetime = None) -> Dict:
         print(f"Thời gian: {duration:.2f}s")
         print(f"{'='*60}\n")
         
-        # ✅ Log vào database (không throw error nếu fail)
         try:
+            week_str = f"{dates[0].strftime('%d/%m')} - {dates[-1].strftime('%d/%m/%Y')}"
+            
             supabase.table('google_sheet_sync_log').insert({
                 'sheet_id': SHEET_ID,
-                'sheet_name': f'Tuần {week_start.date()}',
+                'sheet_name': f'Tuần {week_str}',
                 'range_sync': f'{RANGE_SANG}, {RANGE_CHIEU}',
                 'so_dong_thanh_cong': total_success,
                 'so_dong_loi': total_errors,
@@ -276,9 +302,9 @@ def sync_full_week(week_start: datetime = None) -> Dict:
                 'thoi_gian_xu_ly': int(duration),
                 'log_chi_tiet': f'Sáng: {success_sang}/{error_sang}, Chiều: {success_chieu}/{error_chieu}'
             }).execute()
-            print("✅ Đã log kết quả vào database")
+            print("Đã log kết quả vào database")
         except Exception as log_error:
-            print(f"⚠️  Không thể log vào DB: {log_error}")
+            print(f"Không thể log vào DB: {log_error}")
         
         return {
             'success': total_errors == 0,
@@ -286,8 +312,9 @@ def sync_full_week(week_start: datetime = None) -> Dict:
             'chieu': {'success': success_chieu, 'errors': error_chieu},
             'total_success': total_success,
             'total_errors': total_errors,
-            'error_details': all_errors,  # ✅ Đảm bảo có field này
-            'duration': duration
+            'error_details': all_errors,
+            'duration': duration,
+            'week_range': f"{dates[0].strftime('%d/%m')} - {dates[-1].strftime('%d/%m/%Y')}"
         }
     
     except Exception as e:
@@ -311,23 +338,5 @@ def sync_full_week(week_start: datetime = None) -> Dict:
 
 @retry_patient
 def sync_specific_week(year: int, month: int, day: int) -> Dict:
-    """
-    Sync tuần cụ thể (chỉ định ngày Thứ 2)
-    
-    Args:
-        year: Năm
-        month: Tháng
-        day: Ngày (phải là Thứ 2)
-    
-    Returns:
-        Dict: Kết quả sync (giống sync_full_week)
-    
-    Raises:
-        ValueError: Nếu ngày không phải Thứ 2
-    """
-    week_start = datetime(year, month, day)
-    
-    if week_start.weekday() != 0:
-        raise ValueError(f"Ngày {week_start.date()} không phải Thứ 2! (weekday={week_start.weekday()})")
-    
-    return sync_full_week(week_start)
+    print(f"sync_specific_week() deprecated - redirecting to sync_full_week()")
+    return sync_full_week()
