@@ -1,0 +1,76 @@
+doan_hoi_app/
+│
+├─ .env
+├─ app.py                 # entry point
+├─ requirements.txt
+├─ credentials.json
+├─ user_credentials.json  # Chỉ tồn tại khi người dùng tick ghi nhớ đăng nhập và xóa đi khi người dùng ấn xóa
+├─ .env.encrypted
+├─ build.ps1
+├─ credentials.json.encrypted
+├─ encrypt_config.py
+├─ pyproject.toml
+├─ QuanLyDoanHoi_Setup.iss
+├─ QuanLyDoanHoi.spec
+├─ version_info.txt
+├─ 
+│
+├─ assets/
+│   └─ icons/
+│
+├─ docs/
+│
+├─ core/
+│   ├─ __pycache__/
+│   ├─ supabase_client.py # kết nối supabase
+│   ├─ auth.py            # login + role
+│   ├─ db_retry.py
+│   ├─ auto_updater.py
+│   └─ log.py             # ghi log
+│
+├─ ui/
+│   ├─ __pycache__/
+│   ├─ custom_title_bar.py
+│   ├─ dialog_manager.py
+│   ├─ message_manager.py
+│   ├─ icon_helper.py
+│   ├─ session_helper.py
+│   ├─ tab_noi_bo.py
+│   ├─ login.py
+│   ├─ waiting_approval.py
+│   ├─ tab_luu_tru.py
+│   ├─ main_layout.py
+│   ├─ tab_profile.py
+│   ├─ tab_students.py
+│   ├─ tab_classes.py
+│   └─ tab_staff.py
+│
+├─ services/
+│   ├─ __pycache__/
+│   ├─ students_service.py
+│   ├─ classes_service.py
+│   ├─ staff_service.py
+│   ├─ import_export.py
+│   ├─ profile_service.py
+│   ├─ so_doan_service.py
+│   ├─ tai_san_service.py
+│   ├─ sync_google_sheet.py
+│   └─ noi_bo_service.py
+│
+├─ __pycache__/
+│
+├─ build/
+│
+├─ dist/
+│
+├─ installer_output/
+│
+├─ venv/
+│
+└─ utils/
+    ├─ __pycache__/
+    ├─ __init__.py
+    ├─ excel.py
+    ├─ validator.py
+    ├─ import_export.py
+    └─ can_bo_import_export.py

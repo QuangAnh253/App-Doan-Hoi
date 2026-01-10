@@ -1,0 +1,293 @@
+Xây dựng **ứng dụng nghiệp vụ quản lý Đoàn – Hội** trong **2 tiếng**, ưu tiên:
+
+* Đúng nghiệp vụ thực tế
+* Ổn định, dùng lâu dài
+* Không màu mè, không over-engineering
+
+---
+
+## I. NỀN TẢNG & TRIỂN KHAI
+
+* Ứng dụng **Desktop**, đóng gói **.exe**
+* **Không server riêng**
+* **Dữ liệu realtime** giữa nhiều máy
+* Quy mô ban đầu: ~12.000 bản ghi
+* Dùng cho Văn phòng Đoàn – Hội, tái sử dụng nhiều khóa
+
+👉 **Backend-as-a-Service** để khỏi tự lo auth + sync.
+
+---
+
+## II. ĐĂNG NHẬP & PHÂN QUYỀN
+
+### 🔐 Đăng nhập
+
+* Username + Password
+* Email
+* Facebook
+
+(Dùng auth sẵn của nền tảng, không tự viết)
+
+### 👥 PHÂN QUYỀN (CHỈ 2 ROLE – KHÔNG ĐẺ THÊM)
+
+#### **ADMIN – Chánh Văn phòng**
+
+* CRUD toàn bộ
+* Import / Export
+* Chỉnh sửa hàng loạt
+* Xem log
+
+#### **STAFF – Cán bộ hỗ trợ / BCH được phân công**
+
+* Read + Update
+* ❌ Không import / export
+* ❌ Không copy dữ liệu
+
+📌 Sinh viên thường:
+
+* ❌ Không có tài khoản
+* ❌ Không được cấp file .exe
+
+👉 Mọi thao tác đều **ghi log**.
+
+---
+
+## III. CẤU TRÚC NGHIỆP VỤ – 2 TAB RÕ NGHĨA
+
+---
+
+### 🔹 TAB 1 – QUẢN LÝ SINH VIÊN (KHÓA 74–75)
+
+> Quản lý **theo cá nhân** vì lịch sử thu sổ bị rối.
+
+#### Schema
+
+```
+mssv                TEXT (UNIQUE)
+ho_ten              TEXT
+lop                 TEXT
+ngay_sinh           DATE
+gioi_tinh           TEXT
+noi_sinh            TEXT
+khoa                TEXT
+sdt                 TEXT
+email               TEXT
+
+trang_thai_so       ENUM:
+  - Chưa tiếp nhận (default)
+  - Đang lưu VP
+  - Đã tiếp nhận
+
+vi_tri_luu_so       TEXT
+da_nop_doan_phi     BOOLEAN
+da_nop_hoi_phi      BOOLEAN
+ngay_nop_doan_phi   DATE
+ghi_chu             TEXT
+
+search_vector       TSVECTOR (Unicode tiếng Việt, xử lý đúng “Đ”)
+```
+
+📌 **KHÔNG CÓ**
+
+* `nguon_tiep_nhan`
+* `ngay_tiep_nhan_so`
+  → vì **không còn giá trị nghiệp vụ**, chỉ gây nhiễu.
+
+---
+
+### 🔹 TAB 2 – QUẢN LÝ LỚP (KHÓA 76+)
+
+> Thu sổ **theo lớp**, quản lý tập thể.
+
+#### Schema
+
+```
+khoa                TEXT (NOT NULL)
+chi_doan            TEXT (UNIQUE)
+si_so               INT
+doan_phi            NUMERIC
+hoi_phi             NUMERIC
+tien_da_nop         NUMERIC
+so_luong_da_ky      INT
+
+trang_thai_so       TEXT
+ngay_nop_so         DATE
+vi_tri_luu_so       TEXT
+can_bo_phu_trach    TEXT
+ghi_chu             TEXT
+```
+
+📌 `khoa`, `ngay_nop_so`, `can_bo_phu_trach`
+→ **bắt buộc nghiệp vụ**, không phải trang trí.
+
+---
+
+## IV. QUẢN LÝ CÁN BỘ LỚP (BẢNG RIÊNG – LOGIC VAI TRÒ)
+
+> Không ép đủ info – đúng thực tế.
+
+#### Schema
+
+```
+khoa_vien           TEXT (NOT NULL)
+chi_doan            TEXT (NOT NULL)
+chuc_vu             TEXT (NOT NULL)
+
+ho_ten              TEXT (NULLABLE)
+mssv                TEXT (NULLABLE)
+ngay_sinh           DATE (NULLABLE)
+sdt                 TEXT (NULLABLE)
+```
+
+---
+
+## V. TÌM KIẾM – HIỂN THỊ – CHỈNH SỬA
+
+* Search theo:
+
+  * MSSV
+  * Họ tên (Unicode)
+  * Lớp
+
+* Hiển thị:
+
+  * 100 bản ghi / trang
+  * Có phân trang
+
+* Cho phép:
+
+  * Chọn nhiều bản ghi
+  * Chọn toàn bộ kết quả đang hiển thị
+  * Chỉnh sửa hàng loạt
+
+---
+
+## VI. IMPORT / EXPORT – TRỌNG TÂM SỐNG CÒN
+
+### 🎯 TRIẾT LÝ
+
+* ❌ Không clean dữ liệu phức tạp bằng code
+* ✅ Người dùng nhập **đúng FILE MẪU CHUẨN**
+
+---
+
+### 📥 IMPORT – 3 FILE MẪU
+
+#### 1️⃣ SINH VIÊN MỚI (Khóa sau)
+
+* MSSV bắt buộc
+* Chống conflict
+* Cột cố định, không lệch
+
+#### 2️⃣ LỚP MỚI (Khóa sau)
+
+* Bắt buộc: `khoa`, `chi_doan`, `si_so`
+
+#### 3️⃣ CÁN BỘ LỚP
+
+* Bắt buộc:
+
+  * Khoa/Viện
+  * Chi đoàn
+  * Chức vụ
+* Thông tin cá nhân **được phép trống**
+
+#### Quy trình
+
+```
+Upload → Preview → Validate → Confirm → Ghi DB
+```
+
+---
+
+### 📤 EXPORT
+
+* Xuất `.xlsx` theo:
+
+  * Kết quả search
+  * Danh sách đang chọn
+
+---
+
+## VII. CRUD THỦ CÔNG
+
+Chỉ dùng cho:
+
+* Bổ sung SV thiếu info
+* Nhập tay cán bộ lớp
+
+❌ Không dùng CRUD cho dữ liệu lớn
+
+---
+
+## VIII. LOG & KIỂM SOÁT
+
+Ghi log:
+
+* User
+* Thời gian
+* Hành động
+* Bảng dữ liệu
+
+👉 STAFF luôn bị giám sát.
+
+---
+
+## IX. TRIẾT LÝ THIẾT KẾ (RẤT QUAN TRỌNG)
+
+* Ưu tiên nghiệp vụ thật > chuẩn hóa lý thuyết
+* Không tạo dữ liệu giả cho đẹp
+* Schema gọn, dễ maintain **5–7 năm**
+* Dùng được ngay cho Văn phòng Đoàn – Hội
+
+---
+
+# 🔧 TECH STACK – CHỐT ĐỂ KHÔNG CONFLICT
+
+## 🧠 CORE STACK (ĐÃ KIỂM SOÁT RỦI RO)
+
+### 🐍 Python
+
+* **Python 3.11.x** ✅ (bạn đang dùng → giữ nguyên)
+
+### 🖥️ UI
+
+* **Flet 0.20.2**
+
+  * 0.20.x là nhánh ổn định, ít đổi tên API
+
+### ☁️ Backend / Realtime / Auth
+
+* **Supabase**
+
+  * PostgreSQL
+  * Auth (Email, Facebook)
+  * Realtime
+  * Row Level Security
+
+👉 Không tự build backend → tiết kiệm 70% thời gian.
+
+### 📦 Đóng gói .exe
+
+* **PyInstaller 6.3.0**
+
+  * Test ổn với Python 3.11
+  * Không dùng bản cũ
+
+### 📊 Excel
+
+* **pandas 2.1.x**
+* **openpyxl 3.1.x**
+
+---
+
+## 📌 VERSION LOCK (RẤT QUAN TRỌNG – COPY NGUYÊN)
+
+```
+python==3.11.x
+flet==0.20.2
+supabase==2.3.0
+pandas==2.1.4
+openpyxl==3.1.2
+pyinstaller==6.3.0
+```

@@ -1,0 +1,59 @@
+# ===============================
+# Python / Flet
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtual environment
+venv/
+.env/
+.env.*
+!.env.example
+
+# ===============================
+# Secrets / Credentials (CỰC KỲ QUAN TRỌNG)
+# ===============================
+credentials.json
+user_credentials.json
+.env.encrypted
+credentials.json.encrypted
+
+# ===============================
+# Build / Package output
+# ===============================
+build/
+dist/
+installer_output/
+
+*.spec
+*.iss
+
+# ===============================
+# OS / Editor
+# ===============================
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+
+# ===============================
+# Runtime / App data
+# ===============================
+*.db
+*.sqlite3
+
+# ===============================
+# Logs
+# ===============================
+logs/
+*.log
+
+# ===============================
+# Auto updater / temp
+# ===============================
+*.tmp
+*.temp
