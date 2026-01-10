@@ -12,6 +12,7 @@ venv/
 .env/
 .env.*
 !.env.example
+.env
 
 # ===============================
 # Secrets / Credentials (CỰC KỲ QUAN TRỌNG)
@@ -57,3 +58,8 @@ logs/
 # ===============================
 *.tmp
 *.temp
+
+build.ps1
+
+pyproject.toml
+

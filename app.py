@@ -3,6 +3,10 @@ import flet as ft
 import asyncio
 import os
 import sys
+
+CURRENT_VERSION = "1.7.0"
+GITHUB_REPO = "https://github.com/QuangAnh253/App-Doan-Hoi"
+
 try:
     print("[APP] Loading encrypted config...")
     from secure_config import load_env_variables
@@ -10,7 +14,7 @@ try:
     print("[APP] Encrypted config loaded successfully")
     USING_ENCRYPTED_CONFIG = True
 except Exception as e:
-    print(f"[APP]  Failed to load encrypted config: {e}")
+    print(f"[APP] Failed to load encrypted config: {e}")
     print("[APP] Falling back to regular .env file...")
     from dotenv import load_dotenv
     load_dotenv()
@@ -18,7 +22,7 @@ except Exception as e:
 
 from ui.login import LoginView
 from ui.main_layout import MainLayout, ensure_fullscreen_on_activate
-
+from core.auto_updater import check_update_on_startup
 
 def get_icon_path():
     if getattr(sys, 'frozen', False):
@@ -26,7 +30,6 @@ def get_icon_path():
     else:
         base_path = os.path.dirname(os.path.abspath(__file__))
     
-    # Try multiple icon paths
     icon_paths = [
         os.path.join(base_path, "assets", "favicon.ico"),
         os.path.join(base_path, "assets", "icon.png"),
@@ -47,43 +50,42 @@ def main(page: ft.Page):
     page.padding = 0
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # Set window icon
     try:
         icon_path = get_icon_path()
         if icon_path:
             page.window.icon = icon_path
             print(f"[APP] Set window icon: {icon_path}")
         else:
-            print(f"[APP]  Icon not found in assets folder")
+            print(f"[APP] Icon not found in assets folder")
     except Exception as e:
         print(f"[APP] Failed to set icon: {e}")
 
-    # Hide title bar (custom title bar)
     try:
         page.window.title_bar_hidden = True
         print("[APP] Hidden default title bar")
     except Exception as e:
-        print(f"[APP]  Failed to hide title bar: {e}")
+        print(f"[APP] Failed to hide title bar: {e}")
 
-    # Set window properties
     page.window.width = 1400
     page.window.height = 900
     page.window.resizable = True
     page.window.maximizable = True
     page.window.minimizable = True
     page.update()
+    
     try:
         page.window.maximized = True
         page.update()
         print("[APP] Window maximized")
     except Exception as e:
-        print(f"[APP]  Failed to maximize window: {e}")
+        print(f"[APP] Failed to maximize window: {e}")
 
-    # Log config status
     if USING_ENCRYPTED_CONFIG:
         print("[APP] Running with ENCRYPTED config (secure)")
     else:
         print("[APP] Running with PLAIN .env file (development mode)")
+    
+    print(f"[APP] Current version: {CURRENT_VERSION}")
 
     def on_login_success(session):
         try:
@@ -114,12 +116,11 @@ def main(page: ft.Page):
 
         page.controls.clear()
         
-        # THÊM KIỂM TRA NEW_USER
         if session.role == 'NEW_USER':
             from ui.waiting_approval import WaitingApprovalView
             page.add(WaitingApprovalView(page, session.email, session.full_name).build())
         else:
-            page.add(MainLayout(page, session.role))
+            page.add(MainLayout(page, session.role, CURRENT_VERSION, GITHUB_REPO))
         
         page.update()
         
@@ -127,6 +128,8 @@ def main(page: ft.Page):
             ensure_fullscreen_on_activate(page)
         except Exception as e:
             print(f"[APP] Failed to ensure fullscreen: {e}")
+        
+        page.run_task(check_update_on_startup, page, CURRENT_VERSION, GITHUB_REPO)
 
     login_view = LoginView(on_login_success, page)
     page.add(login_view.build())
@@ -139,13 +142,11 @@ def main(page: ft.Page):
             await asyncio.sleep(delay)
             
             try:
-                # Hide title bar
                 try:
                     page.window.title_bar_hidden = True
                 except:
                     pass
                 
-                # Maximize window
                 try:
                     page.window.maximized = True
                     page.window.resizable = True
@@ -163,6 +164,7 @@ if __name__ == "__main__":
     print("")
     print("="*60)
     print("QUẢN LÝ ĐOÀN - HỘI")
+    print(f"Version: {CURRENT_VERSION}")
     print("="*60)
     print("")
     

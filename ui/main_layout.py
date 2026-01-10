@@ -15,7 +15,27 @@ from ui.message_manager import MessageManager
 from ui.custom_title_bar import CustomTitleBar
 
 
-def MainLayout(page: ft.Page, role: str):
+def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo: str = ""):
+    """
+    Main layout với auto-update support
+    
+    Args:
+        page: Flet page object
+        role: User role (ADMIN, STAFF, etc.)
+        current_version: App version (e.g., "1.6.0")
+        github_repo: GitHub repo URL (e.g., "https://github.com/user/repo")
+    """
+    
+    # Parse GitHub repo từ URL về format "user/repo"
+    repo_name = ""
+    if github_repo and "github.com/" in github_repo:
+        try:
+            # Extract "user/repo" from "https://github.com/user/repo"
+            parts = github_repo.split("github.com/")[-1].split("/")
+            if len(parts) >= 2:
+                repo_name = f"{parts[0]}/{parts[1]}"
+        except:
+            pass
     
     user_info = get_user_info(page)
     full_name = user_info['full_name']
@@ -126,6 +146,157 @@ def MainLayout(page: ft.Page, role: str):
             page.snack_bar.open = True
             page.update()
 
+    # ✅ CHECK UPDATE HANDLER
+    def handle_check_update(e):
+        """Kiểm tra cập nhật thủ công"""
+        if not current_version or not repo_name:
+            message_manager = MessageManager(page)
+            message_manager.warning("Chức năng cập nhật chưa được cấu hình")
+            return
+        
+        try:
+            from core.auto_updater import AutoUpdater, UpdateDialog
+        except ImportError:
+            message_manager = MessageManager(page)
+            message_manager.error("Module auto_updater chưa được cài đặt")
+            return
+        
+        updater = AutoUpdater(current_version, repo_name)
+        
+        # Loading dialog với style chuẩn
+        loading_dlg = ft.AlertDialog(
+            modal=True,
+            content=ft.Container(
+                width=300,
+                content=ft.Column([
+                    ft.Row([
+                        ft.ProgressRing(width=30, height=30, stroke_width=3, color=ft.Colors.BLUE_600),
+                        ft.Text("Đang kiểm tra cập nhật...", size=14, weight=ft.FontWeight.W_500)
+                    ], spacing=12, alignment=ft.MainAxisAlignment.CENTER),
+                ], spacing=0, tight=True),
+                padding=20,
+                alignment=ft.Alignment.CENTER,
+            ),
+            bgcolor=ft.Colors.WHITE,
+            shape=ft.RoundedRectangleBorder(radius=12),
+        )
+        
+        dialog_manager.show_dialog(loading_dlg)
+        
+        async def do_check():
+            update_info = await asyncio.to_thread(updater.check_for_update)
+            
+            # Đóng loading
+            dialog_manager.close_current_dialog()
+            await asyncio.sleep(0.2)
+            
+            if update_info['error']:
+                # Dialog lỗi với style chuẩn
+                error_content = ft.Container(
+                    width=400,
+                    content=ft.Column([
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Container(
+                                    content=CustomIcon.create(CustomIcon.ERROR, size=28),
+                                    padding=10,
+                                    bgcolor=ft.Colors.RED_50,
+                                    border_radius=50,
+                                    border=ft.border.all(1, ft.Colors.RED_200)
+                                ),
+                                ft.Column([
+                                    ft.Text("Lỗi kiểm tra cập nhật", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_900),
+                                    ft.Text(update_info['error'], size=13, color=ft.Colors.GREY_700),
+                                ], spacing=4, tight=True, expand=True)
+                            ], spacing=12),
+                            padding=15,
+                            border=ft.border.all(1, ft.Colors.RED_200),
+                            border_radius=8,
+                            bgcolor=ft.Colors.RED_50
+                        ),
+                    ], spacing=0, tight=True)
+                )
+                
+                close_btn = ft.ElevatedButton(
+                    "Đóng",
+                    on_click=lambda _: dialog_manager.close_current_dialog(),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.GREY_300),
+                )
+                
+                error_dlg = ft.AlertDialog(
+                    modal=True,
+                    title=ft.Row([
+                        CustomIcon.create(CustomIcon.ERROR, size=24),
+                        ft.Text("Kiểm tra cập nhật", weight=ft.FontWeight.BOLD)
+                    ], spacing=10),
+                    content=error_content,
+                    actions=[close_btn],
+                    bgcolor=ft.Colors.WHITE,
+                    content_padding=24,
+                    shape=ft.RoundedRectangleBorder(radius=12),
+                )
+                
+                dialog_manager.show_dialog(error_dlg)
+            
+            elif update_info['has_update']:
+                # Hiện dialog update với UI đẹp
+                update_dialog_mgr = UpdateDialog(page, updater)
+                update_dialog_mgr.show_update_available(update_info)
+            
+            else:
+                # Dialog đã cập nhật với style chuẩn
+                success_content = ft.Container(
+                    width=400,
+                    content=ft.Column([
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Container(
+                                    content=CustomIcon.create(CustomIcon.CHECK_GREEN, size=28),
+                                    padding=10,
+                                    bgcolor=ft.Colors.GREEN_50,
+                                    border_radius=50,
+                                    border=ft.border.all(1, ft.Colors.GREEN_200)
+                                ),
+                                ft.Column([
+                                    ft.Text("Đã cập nhật", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_900),
+                                    ft.Text(
+                                        f"Bạn đang dùng phiên bản mới nhất ({current_version})",
+                                        size=13,
+                                        color=ft.Colors.GREY_700
+                                    ),
+                                ], spacing=4, tight=True, expand=True)
+                            ], spacing=12),
+                            padding=15,
+                            border=ft.border.all(1, ft.Colors.GREEN_200),
+                            border_radius=8,
+                            bgcolor=ft.Colors.GREEN_50
+                        ),
+                    ], spacing=0, tight=True)
+                )
+                
+                close_btn = ft.ElevatedButton(
+                    "Đóng",
+                    on_click=lambda _: dialog_manager.close_current_dialog(),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.GREY_300),
+                )
+                
+                success_dlg = ft.AlertDialog(
+                    modal=True,
+                    title=ft.Row([
+                        CustomIcon.create(CustomIcon.CHECK_GREEN, size=24),
+                        ft.Text("Kiểm tra cập nhật", weight=ft.FontWeight.BOLD)
+                    ], spacing=10),
+                    content=success_content,
+                    actions=[close_btn],
+                    bgcolor=ft.Colors.WHITE,
+                    content_padding=24,
+                    shape=ft.RoundedRectangleBorder(radius=12),
+                )
+                
+                dialog_manager.show_dialog(success_dlg)
+        
+        page.run_task(do_check)
+
     def handle_logout(e):
         dialog_manager.close_all_dialogs()
         
@@ -146,47 +317,14 @@ def MainLayout(page: ft.Page, role: str):
             set_session_value(page, "full_name", session.full_name)
             
             page.controls.clear()
-            page.add(MainLayout(page, session.role))
+            page.add(MainLayout(page, session.role, current_version, github_repo))
             page.update()
         
         login_view = LoginView(on_new_login, page)
         page.add(login_view.build())
         page.update()
 
-    user_menu_items = [
-        ft.PopupMenuItem(
-            content=ft.Row([
-                CustomIcon.create(CustomIcon.PERSON, size=18),
-                ft.Text("Tài khoản cá nhân", size=13),
-            ], spacing=8),
-            on_click=show_profile_popup,
-        ),
-    ]
-    
-    if is_admin(actual_role):
-        user_menu_items.append(
-            ft.PopupMenuItem(
-                content=ft.Row([
-                    CustomIcon.create(CustomIcon.ADMIN, size=18),
-                    ft.Text("Quản lý tài khoản", size=13),
-                ], spacing=8),
-                on_click=show_user_management_popup,
-            )
-        )
-    
-    user_menu_items.append(ft.Divider())
-    user_menu_items.append(
-        ft.PopupMenuItem(
-            content=ft.Row([
-                CustomIcon.create(CustomIcon.LOGOUT, size=18),
-                ft.Text("Đăng xuất", size=13),
-            ], spacing=8),
-            on_click=handle_logout,
-        )
-    )
-    
-
-    # CUSTOM TITLE BAR
+    # ✅ CUSTOM TITLE BAR VỚI NÚT UPDATE
     title_bar = CustomTitleBar(
         page=page,
         title="HỆ THỐNG QUẢN LÝ ĐOÀN - HỘI",
@@ -197,6 +335,8 @@ def MainLayout(page: ft.Page, role: str):
         on_profile_click=show_profile_popup,
         on_user_management_click=show_user_management_popup if is_admin(actual_role) else None,
         on_logout_click=handle_logout,
+        on_check_update_click=handle_check_update if current_version and repo_name else None,
+        current_version=current_version,
     ).build()
 
     tab_state = {"current_index": 0}
@@ -240,7 +380,6 @@ def MainLayout(page: ft.Page, role: str):
     tab_buttons = []
     
     def switch_tab(index):
-        """Chuyển đổi tab"""
         dialog_manager.close_all_dialogs()
         
         tab_state["current_index"] = index

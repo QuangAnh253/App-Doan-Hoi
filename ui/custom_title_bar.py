@@ -15,6 +15,8 @@ class CustomTitleBar:
         on_profile_click=None,
         on_user_management_click=None,
         on_logout_click=None,
+        on_check_update_click=None,  # ✅ Thêm param
+        current_version: str = "",  # ✅ Thêm param
     ):
         self.page = page
         self.title = title
@@ -25,6 +27,8 @@ class CustomTitleBar:
         self.on_profile_click = on_profile_click
         self.on_user_management_click = on_user_management_click
         self.on_logout_click = on_logout_click
+        self.on_check_update_click = on_check_update_click  # ✅
+        self.current_version = current_version  # ✅
         
     def build(self) -> ft.Container: 
         logo_widget = ft.Image(
@@ -33,16 +37,36 @@ class CustomTitleBar:
             height=36,
             fit="contain",
         )
+        
+        # ✅ Thêm version badge nếu có
+        left_items = [
+            logo_widget,
+            ft.Text(
+                self.title,
+                size=15,
+                weight=ft.FontWeight.W_600,
+                color=ft.Colors.WHITE,
+            ),
+        ]
+        
+        if self.current_version:
+            left_items.append(
+                ft.Container(
+                    content=ft.Text(
+                        f"v{self.current_version}",
+                        size=10,
+                        color=ft.Colors.with_opacity(0.7, ft.Colors.WHITE),
+                        weight=ft.FontWeight.W_500,
+                    ),
+                    padding=ft.padding.symmetric(horizontal=8, vertical=3),
+                    bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
+                    border_radius=4,
+                    border=ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.WHITE)),
+                )
+            )
+        
         left_content = ft.Row(
-            [
-                logo_widget,
-                ft.Text(
-                    self.title,
-                    size=15,
-                    weight=ft.FontWeight.W_600,
-                    color=ft.Colors.WHITE,
-                ),
-            ],
+            left_items,
             spacing=12,
             alignment=ft.MainAxisAlignment.START,
         )
@@ -101,6 +125,19 @@ class CustomTitleBar:
                         ft.Text("Quản lý tài khoản", size=13),
                     ], spacing=8),
                     on_click=self.on_user_management_click,
+                )
+            )
+        
+        # ✅ Thêm nút kiểm tra cập nhật nếu có handler
+        if self.on_check_update_click:
+            user_menu_items.append(ft.Divider(height=1))
+            user_menu_items.append(
+                ft.PopupMenuItem(
+                    content=ft.Row([
+                        CustomIcon.create(CustomIcon.REFRESH, size=16),
+                        ft.Text("Kiểm tra cập nhật", size=13, color=ft.Colors.GREEN_400),
+                    ], spacing=8),
+                    on_click=self.on_check_update_click,
                 )
             )
         

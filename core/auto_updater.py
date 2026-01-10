@@ -524,7 +524,7 @@ async def check_update_on_startup(page: ft.Page, current_version: str, github_re
     Tự động kiểm tra cập nhật khi mở app
     Gọi hàm này trong main() của app.py
     """
-    await asyncio.sleep(3)  # Đợi app load xong
+    await asyncio.sleep(3)
     
     updater = AutoUpdater(current_version, github_repo)
     
