@@ -143,6 +143,10 @@ class UpdateDialog:
         self.page = page
         self.updater = updater
         self.download_progress = None
+        # Lưu reference trực tiếp đến các control
+        self.update_button = None
+        self.later_button = None
+        self.form_column = None
     
     def show_update_available(self, update_info: dict):
         """Hiển thị dialog có bản cập nhật mới - UI đẹp"""
@@ -175,7 +179,7 @@ class UpdateDialog:
             'text': progress_text
         }
         
-        # Release notes box - giống style login
+        # Release notes box
         notes_content = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -208,13 +212,16 @@ class UpdateDialog:
             height=180,
         )
         
-        # Buttons - giống style login
-        update_btn = ft.ElevatedButton(
+        # Dialog reference
+        dialog_ref = {"dialog": None}
+        
+        # Buttons
+        self.update_button = ft.ElevatedButton(
             content=ft.Row([
                 ft.Icon(ft.Icons.DOWNLOAD, size=18, color=ft.Colors.WHITE),
                 ft.Text("Tải về và cài đặt", size=14, weight=ft.FontWeight.W_600)
             ], spacing=8, tight=True, alignment=ft.MainAxisAlignment.CENTER),
-            on_click=lambda e: self._start_download(e, update_info['download_url'], dialog),
+            on_click=lambda e: self._start_download(e, update_info['download_url'], dialog_ref["dialog"]),
             style=ft.ButtonStyle(
                 color=ft.Colors.WHITE,
                 bgcolor=ft.Colors.BLUE_600,
@@ -225,76 +232,79 @@ class UpdateDialog:
             width=float("inf"),
         )
         
-        later_btn = ft.TextButton(
+        self.later_button = ft.TextButton(
             "Để sau",
-            on_click=lambda e: self._close_dialog(dialog),
+            on_click=lambda e: self._close_dialog(dialog_ref["dialog"]),
             style=ft.ButtonStyle(
                 color=ft.Colors.GREY_700,
                 padding=16,
             ),
         )
         
-        # Dialog content - giống layout login
+        # Form column
+        self.form_column = ft.Column([
+            # Header với logo
+            ft.Container(
+                content=ft.Image(src="assets/favicon.ico", width=80, height=80),
+                alignment=ft.Alignment.CENTER,
+                margin=ft.margin.only(bottom=16),
+            ),
+            
+            # Title
+            ft.Text(
+                "🎉 Đã có bản cập nhật mới!",
+                size=24,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.BLACK,
+                text_align=ft.TextAlign.CENTER,
+            ),
+            
+            # Version info
+            ft.Container(
+                content=ft.Column([
+                    ft.Text(
+                        f"Phiên bản {latest_version}",
+                        size=16,
+                        weight=ft.FontWeight.W_600,
+                        color=ft.Colors.BLUE_700,
+                    ),
+                    ft.Text(
+                        f"Dung lượng: {file_size_mb:.1f} MB",
+                        size=13,
+                        color=ft.Colors.GREY_600,
+                    ),
+                ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=12,
+                bgcolor=ft.Colors.BLUE_50,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.BLUE_200),
+            ),
+            
+            ft.Container(height=12),
+            
+            # Release notes
+            notes_content,
+            
+            ft.Container(height=16),
+            
+            # Progress section
+            progress_bar,
+            ft.Container(height=6, visible=False),
+            progress_text,
+            
+            ft.Container(height=16),
+            
+            # Buttons
+            self.update_button,
+            ft.Container(height=8),
+            self.later_button,
+            
+        ], spacing=0, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        
+        # Dialog content
         content = ft.Container(
             width=520,
-            content=ft.Column([
-                # Header với logo
-                ft.Container(
-                    content=ft.Image(src="assets/favicon.ico", width=80, height=80),
-                    alignment=ft.Alignment.CENTER,
-                    margin=ft.margin.only(bottom=16),
-                ),
-                
-                # Title
-                ft.Text(
-                    "🎉 Đã có bản cập nhật mới!",
-                    size=24,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.BLACK,
-                    text_align=ft.TextAlign.CENTER,
-                ),
-                
-                # Version info
-                ft.Container(
-                    content=ft.Column([
-                        ft.Text(
-                            f"Phiên bản {latest_version}",
-                            size=16,
-                            weight=ft.FontWeight.W_600,
-                            color=ft.Colors.BLUE_700,
-                        ),
-                        ft.Text(
-                            f"Dung lượng: {file_size_mb:.1f} MB",
-                            size=13,
-                            color=ft.Colors.GREY_600,
-                        ),
-                    ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    padding=12,
-                    bgcolor=ft.Colors.BLUE_50,
-                    border_radius=8,
-                    border=ft.border.all(1, ft.Colors.BLUE_200),
-                ),
-                
-                ft.Container(height=12),
-                
-                # Release notes
-                notes_content,
-                
-                ft.Container(height=16),
-                
-                # Progress section
-                progress_bar,
-                ft.Container(height=6, visible=False, ref=ft.Ref[ft.Container]()),
-                progress_text,
-                
-                ft.Container(height=16),
-                
-                # Buttons
-                update_btn,
-                ft.Container(height=8),
-                later_btn,
-                
-            ], spacing=0, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            content=self.form_column,
             padding=ft.padding.symmetric(horizontal=40, vertical=32),
             border_radius=16,
             bgcolor=ft.Colors.WHITE,
@@ -306,7 +316,7 @@ class UpdateDialog:
             ),
         )
         
-        # Background giống login
+        # Background
         background = ft.Container(
             content=ft.Image(
                 src="assets/bg.png",
@@ -340,6 +350,8 @@ class UpdateDialog:
             content_padding=0,
         )
         
+        dialog_ref["dialog"] = dialog
+        
         self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
@@ -349,9 +361,12 @@ class UpdateDialog:
     def _start_download(self, e, download_url: str, dialog: ft.AlertDialog):
         """Bắt đầu tải file"""
         
-        # Disable update button
-        dialog.content.content.controls[1].content.controls[-3].disabled = True
-        dialog.content.content.controls[1].content.controls[-1].disabled = True
+        # Disable buttons bằng reference trực tiếp
+        try:
+            self.update_button.disabled = True
+            self.later_button.disabled = True
+        except Exception as ex:
+            print(f"[UPDATE] Error disabling buttons: {ex}")
         
         # Hiện progress
         self.download_progress['bar'].visible = True
@@ -381,9 +396,8 @@ class UpdateDialog:
         self.download_progress['text'].color = ft.Colors.GREEN_700
         self.download_progress['text'].weight = ft.FontWeight.BOLD
         
-        # Thay nút update bằng nút install
-        content_container = dialog.content.content.controls[1].content
-        content_container.controls[-3] = ft.ElevatedButton(
+        # Tạo nút install mới
+        install_button = ft.ElevatedButton(
             content=ft.Row([
                 ft.Icon(ft.Icons.INSTALL_DESKTOP, size=18, color=ft.Colors.WHITE),
                 ft.Text("Cài đặt ngay", size=14, weight=ft.FontWeight.W_600)
@@ -399,7 +413,19 @@ class UpdateDialog:
             width=float("inf"),
         )
         
-        content_container.controls[-1].visible = False  # Ẩn nút "Để sau"
+        # Thay thế button trong form_column
+        try:
+            # Tìm index của update_button
+            for i, control in enumerate(self.form_column.controls):
+                if control == self.update_button:
+                    self.form_column.controls[i] = install_button
+                    break
+            
+            # Ẩn later_button
+            self.later_button.visible = False
+            
+        except Exception as ex:
+            print(f"[UPDATE] Error updating buttons: {ex}")
         
         self.page.update()
     
@@ -413,8 +439,11 @@ class UpdateDialog:
         self.download_progress['text'].visible = True
         
         # Enable lại buttons
-        dialog.content.content.controls[1].content.controls[-3].disabled = False
-        dialog.content.content.controls[1].content.controls[-1].disabled = False
+        try:
+            self.update_button.disabled = False
+            self.later_button.disabled = False
+        except Exception as ex:
+            print(f"[UPDATE] Error re-enabling buttons: {ex}")
         
         self.page.update()
     
