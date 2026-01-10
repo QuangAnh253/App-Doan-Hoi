@@ -1356,8 +1356,37 @@ def NoiBoTab(page: ft.Page, role: str):
             "current_week_offset": 0,
         }
         
-        loading_indicator = ft.ProgressRing(visible=False, width=30, height=30)
+        loading_indicator = ft.ProgressRing(visible=False, width=30, height=30, color=ft.Colors.BLUE_600)
         
+        sync_loading_overlay = ft.Container(
+            visible=False,
+            bgcolor=ft.Colors.with_opacity(0.85, ft.Colors.BLACK),
+            content=ft.Column(
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        content=ft.Image(src="assets/favicon.ico", width=80, height=80),
+                        margin=ft.margin.only(bottom=16),
+                    ),
+                    ft.ProgressRing(width=60, height=60, stroke_width=4, color=ft.Colors.WHITE),
+                    ft.Container(height=20),
+                    ft.Text(
+                        "Đang đồng bộ Google Sheet...",
+                        size=20,
+                        color=ft.Colors.WHITE,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(
+                        "Vui lòng đợi trong giây lát",
+                        size=14,
+                        color=ft.Colors.WHITE70,
+                    ),
+                ],
+            ),
+            expand=True,
+        )
+
         # Loading overlay (cho sync)
         loading_overlay = ft.Container(
             visible=False,
@@ -1483,7 +1512,7 @@ def NoiBoTab(page: ft.Page, role: str):
                     pass
                 
                 # Hiện loading overlay
-                loading_overlay.visible = True
+                sync_loading_overlay.visible = True
                 page.update()
                 
                 try:
@@ -1491,14 +1520,14 @@ def NoiBoTab(page: ft.Page, role: str):
                     result = await asyncio.to_thread(sync_full_week)
                     
                     # Tắt loading
-                    loading_overlay.visible = False
+                    sync_loading_overlay.visible = False
                     page.update()
                     
                     # --- HIỂN THỊ KẾT QUẢ ---
                     await show_result_dialog(result)
                     
                 except Exception as ex:
-                    loading_overlay.visible = False
+                    sync_loading_overlay.visible = False
                     page.update()
                     message_manager.error(f"Lỗi hệ thống: {ex}")
             
@@ -3010,7 +3039,7 @@ def NoiBoTab(page: ft.Page, role: str):
                     week_view_container,
                 ],
             ),
-            loading_overlay,
+            sync_loading_overlay,
         ], expand=True)
         
         async def _delayed_load():

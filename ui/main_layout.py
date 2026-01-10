@@ -16,21 +16,9 @@ from ui.custom_title_bar import CustomTitleBar
 
 
 def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo: str = ""):
-    """
-    Main layout với auto-update support
-    
-    Args:
-        page: Flet page object
-        role: User role (ADMIN, STAFF, etc.)
-        current_version: App version (e.g., "1.6.0")
-        github_repo: GitHub repo URL (e.g., "https://github.com/user/repo")
-    """
-    
-    # Parse GitHub repo từ URL về format "user/repo"
     repo_name = ""
     if github_repo and "github.com/" in github_repo:
         try:
-            # Extract "user/repo" from "https://github.com/user/repo"
             parts = github_repo.split("github.com/")[-1].split("/")
             if len(parts) >= 2:
                 repo_name = f"{parts[0]}/{parts[1]}"
@@ -146,9 +134,7 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
             page.snack_bar.open = True
             page.update()
 
-    # ✅ CHECK UPDATE HANDLER
     def handle_check_update(e):
-        """Kiểm tra cập nhật thủ công"""
         if not current_version or not repo_name:
             message_manager = MessageManager(page)
             message_manager.warning("Chức năng cập nhật chưa được cấu hình")
@@ -163,22 +149,15 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
         
         updater = AutoUpdater(current_version, repo_name)
         
-        # Loading dialog với style chuẩn
         loading_dlg = ft.AlertDialog(
             modal=True,
-            content=ft.Container(
-                width=300,
-                content=ft.Column([
-                    ft.Row([
-                        ft.ProgressRing(width=30, height=30, stroke_width=3, color=ft.Colors.BLUE_600),
-                        ft.Text("Đang kiểm tra cập nhật...", size=14, weight=ft.FontWeight.W_500)
-                    ], spacing=12, alignment=ft.MainAxisAlignment.CENTER),
-                ], spacing=0, tight=True),
-                padding=20,
-                alignment=ft.Alignment.CENTER,
-            ),
+            content=ft.Row([
+                ft.ProgressRing(width=24, height=24, stroke_width=3, color=ft.Colors.BLUE_600),
+                ft.Text("Đang kiểm tra cập nhật...", size=13)
+            ], spacing=10, tight=True),
+            content_padding=ft.padding.all(20),
             bgcolor=ft.Colors.WHITE,
-            shape=ft.RoundedRectangleBorder(radius=12),
+            shape=ft.RoundedRectangleBorder(radius=8),
         )
         
         dialog_manager.show_dialog(loading_dlg)
@@ -186,12 +165,10 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
         async def do_check():
             update_info = await asyncio.to_thread(updater.check_for_update)
             
-            # Đóng loading
             dialog_manager.close_current_dialog()
             await asyncio.sleep(0.2)
             
             if update_info['error']:
-                # Dialog lỗi với style chuẩn
                 error_content = ft.Container(
                     width=400,
                     content=ft.Column([
@@ -239,12 +216,10 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
                 dialog_manager.show_dialog(error_dlg)
             
             elif update_info['has_update']:
-                # Hiện dialog update với UI đẹp
                 update_dialog_mgr = UpdateDialog(page, updater)
                 update_dialog_mgr.show_update_available(update_info)
             
             else:
-                # Dialog đã cập nhật với style chuẩn
                 success_content = ft.Container(
                     width=400,
                     content=ft.Column([
@@ -324,7 +299,6 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
         page.add(login_view.build())
         page.update()
 
-    # ✅ CUSTOM TITLE BAR VỚI NÚT UPDATE
     title_bar = CustomTitleBar(
         page=page,
         title="HỆ THỐNG QUẢN LÝ ĐOÀN - HỘI",
@@ -441,7 +415,6 @@ def MainLayout(page: ft.Page, role: str, current_version: str = "", github_repo:
             tab_content_container,
         ],
     )
-
 
 def ensure_fullscreen_on_activate(page: ft.Page) -> None:
     async def _apply_maximize():

@@ -1,9 +1,4 @@
 # core/auto_updater.py
-"""
-Hệ thống tự động cập nhật cho app Quản lý Đoàn - Hội
-Kiểm tra version mới từ GitHub Releases và tải về
-"""
-
 import os
 import sys
 import json
@@ -20,8 +15,6 @@ from ui.icon_helper import CustomIcon
 
 
 class AutoUpdater:
-    """Auto-update manager cho ứng dụng"""
-    
     def __init__(self, 
                  current_version: str,
                  github_repo: str,
@@ -32,7 +25,6 @@ class AutoUpdater:
         self.api_url = f"https://api.github.com/repos/{github_repo}/releases/latest"
     
     def should_check_update(self, check_interval_hours: int = 24) -> bool:
-        """Kiểm tra xem đã đến lúc check update chưa"""
         try:
             if not os.path.exists(self.update_check_file):
                 return True
@@ -46,7 +38,6 @@ class AutoUpdater:
             return True
     
     def save_check_time(self):
-        """Lưu thời gian check update"""
         try:
             with open(self.update_check_file, 'w') as f:
                 json.dump({
@@ -57,10 +48,6 @@ class AutoUpdater:
             pass
     
     def check_for_update(self) -> dict:
-        """
-        Kiểm tra version mới trên GitHub
-        Returns: dict chứa thông tin update
-        """
         result = {
             'has_update': False,
             'latest_version': self.current_version,
@@ -102,7 +89,6 @@ class AutoUpdater:
         return result
     
     def download_update(self, download_url: str, progress_callback=None) -> str:
-        """Tải file cập nhật về"""
         temp_dir = tempfile.gettempdir()
         filename = download_url.split('/')[-1]
         filepath = os.path.join(temp_dir, filename)
@@ -125,7 +111,6 @@ class AutoUpdater:
         return filepath
     
     def install_update(self, installer_path: str):
-        """Chạy installer và thoát app"""
         if sys.platform == 'win32':
             subprocess.Popen([installer_path], shell=True)
         elif sys.platform == 'darwin':
@@ -137,25 +122,19 @@ class AutoUpdater:
 
 
 class UpdateDialog:
-    """Dialog hiển thị thông báo cập nhật - UI đẹp giống Login"""
-    
     def __init__(self, page: ft.Page, updater: AutoUpdater):
         self.page = page
         self.updater = updater
         self.download_progress = None
-        # Lưu reference trực tiếp đến các control
         self.update_button = None
         self.later_button = None
         self.form_column = None
     
     def show_update_available(self, update_info: dict):
-        """Hiển thị dialog có bản cập nhật mới - UI đẹp"""
-        
         latest_version = update_info['latest_version']
         release_notes = update_info['release_notes']
         file_size_mb = update_info['file_size'] / (1024 * 1024)
         
-        # Progress components
         progress_bar = ft.ProgressBar(
             value=0,
             width=450,
@@ -178,14 +157,13 @@ class UpdateDialog:
             'bar': progress_bar,
             'text': progress_text
         }
-        
-        # Release notes box
+
         notes_content = ft.Container(
             content=ft.Column([
                 ft.Row([
                     CustomIcon.create(CustomIcon.INFO, size=16),
                     ft.Text(
-                        "✨ Tính năng mới:",
+                        "Tính năng mới:",
                         size=14,
                         weight=ft.FontWeight.BOLD,
                         color=ft.Colors.GREY_900
@@ -212,10 +190,8 @@ class UpdateDialog:
             height=180,
         )
         
-        # Dialog reference
         dialog_ref = {"dialog": None}
         
-        # Buttons
         self.update_button = ft.ElevatedButton(
             content=ft.Row([
                 ft.Icon(ft.Icons.DOWNLOAD, size=18, color=ft.Colors.WHITE),
@@ -241,25 +217,21 @@ class UpdateDialog:
             ),
         )
         
-        # Form column
         self.form_column = ft.Column([
-            # Header với logo
             ft.Container(
                 content=ft.Image(src="assets/favicon.ico", width=80, height=80),
                 alignment=ft.Alignment.CENTER,
                 margin=ft.margin.only(bottom=16),
             ),
-            
-            # Title
+     
             ft.Text(
-                "🎉 Đã có bản cập nhật mới!",
+                "Đã có bản cập nhật mới!",
                 size=24,
                 weight=ft.FontWeight.BOLD,
                 color=ft.Colors.BLACK,
                 text_align=ft.TextAlign.CENTER,
             ),
-            
-            # Version info
+
             ft.Container(
                 content=ft.Column([
                     ft.Text(
@@ -281,27 +253,18 @@ class UpdateDialog:
             ),
             
             ft.Container(height=12),
-            
-            # Release notes
             notes_content,
-            
             ft.Container(height=16),
-            
-            # Progress section
             progress_bar,
             ft.Container(height=6, visible=False),
             progress_text,
-            
             ft.Container(height=16),
-            
-            # Buttons
             self.update_button,
             ft.Container(height=8),
             self.later_button,
             
         ], spacing=0, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
         
-        # Dialog content
         content = ft.Container(
             width=520,
             content=self.form_column,
@@ -316,7 +279,6 @@ class UpdateDialog:
             ),
         )
         
-        # Background
         background = ft.Container(
             content=ft.Image(
                 src="assets/bg.png",
@@ -359,16 +321,12 @@ class UpdateDialog:
         return dialog
     
     def _start_download(self, e, download_url: str, dialog: ft.AlertDialog):
-        """Bắt đầu tải file"""
-        
-        # Disable buttons bằng reference trực tiếp
         try:
             self.update_button.disabled = True
             self.later_button.disabled = True
         except Exception as ex:
             print(f"[UPDATE] Error disabling buttons: {ex}")
-        
-        # Hiện progress
+
         self.download_progress['bar'].visible = True
         self.download_progress['text'].visible = True
         self.page.update()
@@ -389,14 +347,11 @@ class UpdateDialog:
         
         threading.Thread(target=download_thread, daemon=True).start()
     
-    def _show_install_button(self, dialog: ft.AlertDialog, installer_path: str):
-        """Hiển thị nút cài đặt sau khi tải xong"""
-        
-        self.download_progress['text'].value = "✅ Tải xuống hoàn tất!"
+    def _show_install_button(self, dialog: ft.AlertDialog, installer_path: str):    
+        self.download_progress['text'].value = "Tải xuống hoàn tất!"
         self.download_progress['text'].color = ft.Colors.GREEN_700
         self.download_progress['text'].weight = ft.FontWeight.BOLD
         
-        # Tạo nút install mới
         install_button = ft.ElevatedButton(
             content=ft.Row([
                 ft.Icon(ft.Icons.INSTALL_DESKTOP, size=18, color=ft.Colors.WHITE),
@@ -413,15 +368,12 @@ class UpdateDialog:
             width=float("inf"),
         )
         
-        # Thay thế button trong form_column
         try:
-            # Tìm index của update_button
             for i, control in enumerate(self.form_column.controls):
                 if control == self.update_button:
                     self.form_column.controls[i] = install_button
                     break
             
-            # Ẩn later_button
             self.later_button.visible = False
             
         except Exception as ex:
@@ -430,15 +382,12 @@ class UpdateDialog:
         self.page.update()
     
     def _show_download_error(self, dialog: ft.AlertDialog, error: str):
-        """Hiển thị lỗi tải xuống"""
-        
         self.download_progress['bar'].visible = False
         self.download_progress['text'].value = f"❌ Lỗi: {error}"
         self.download_progress['text'].color = ft.Colors.RED_700
         self.download_progress['text'].weight = ft.FontWeight.BOLD
         self.download_progress['text'].visible = True
         
-        # Enable lại buttons
         try:
             self.update_button.disabled = False
             self.later_button.disabled = False
@@ -448,7 +397,6 @@ class UpdateDialog:
         self.page.update()
     
     def _close_dialog(self, dialog: ft.AlertDialog):
-        """Đóng dialog"""
         dialog.open = False
         if dialog in self.page.overlay:
             self.page.overlay.remove(dialog)
@@ -456,25 +404,20 @@ class UpdateDialog:
 
 
 def show_check_update_button(page: ft.Page, current_version: str, github_repo: str):
-    """
-    Hiển thị nút "Kiểm tra cập nhật" trong menu/settings
-    Gọi hàm này trong UI settings hoặc profile
-    """
-    
     def manual_check_update(e):
         updater = AutoUpdater(current_version, github_repo)
         
-        # Loading dialog
         loading = ft.AlertDialog(
             modal=True,
             content=ft.Container(
                 content=ft.Row([
-                    ft.ProgressRing(width=30, height=30, stroke_width=3),
-                    ft.Text("Đang kiểm tra cập nhật...", size=14)
-                ], spacing=12, tight=True),
-                padding=20,
+                    ft.ProgressRing(width=24, height=24, stroke_width=3),
+                    ft.Text("Đang kiểm tra cập nhật...", size=13)
+                ], spacing=10, tight=True, alignment=ft.MainAxisAlignment.CENTER),
+                padding=ft.padding.symmetric(horizontal=24, vertical=16),
             ),
             bgcolor=ft.Colors.WHITE,
+            shape=ft.RoundedRectangleBorder(radius=8),
         )
         page.overlay.append(loading)
         loading.open = True
@@ -549,15 +492,10 @@ def show_check_update_button(page: ft.Page, current_version: str, github_repo: s
 
 
 async def check_update_on_startup(page: ft.Page, current_version: str, github_repo: str):
-    """
-    Tự động kiểm tra cập nhật khi mở app
-    Gọi hàm này trong main() của app.py
-    """
     await asyncio.sleep(3)
     
     updater = AutoUpdater(current_version, github_repo)
     
-    # Chỉ check nếu đã qua 24h
     if not updater.should_check_update(check_interval_hours=24):
         return
     
