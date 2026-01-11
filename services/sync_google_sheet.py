@@ -5,10 +5,50 @@ from core.db_retry import retry_standard, retry_patient
 from datetime import datetime, timedelta
 from typing import Tuple, List, Dict, Optional
 import re
+import os
+import sys
+
+# ============================================================================
+# CREDENTIALS LOADING - Hỗ trợ cả encrypted và plain file
+# ============================================================================
+def get_credentials_file():
+    """
+    Lấy đường dẫn đến credentials.json
+    - Ưu tiên: credentials.json.encrypted (production)
+    - Fallback: credentials.json (development)
+    """
+    # Kiểm tra xem có encrypted config không
+    try:
+        from secure_config import get_credentials_path
+        # Nếu có encrypted file, dùng nó
+        creds_path = get_credentials_path()
+        print(f"[SYNC] Using encrypted credentials: {creds_path}")
+        return creds_path
+    except FileNotFoundError:
+        print(f"[SYNC] No encrypted credentials found, trying plain file...")
+    except Exception as e:
+        print(f"[SYNC] Error loading encrypted credentials: {e}")
+    
+    # Fallback: tìm file credentials.json thô (dev mode)
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    plain_creds = os.path.join(base_path, 'credentials.json')
+    
+    if os.path.exists(plain_creds):
+        print(f"[SYNC] Using plain credentials (dev mode): {plain_creds}")
+        return plain_creds
+    
+    # Không tìm thấy credentials nào
+    raise FileNotFoundError(
+        "Không tìm thấy credentials.json hoặc credentials.json.encrypted. "
+        "Vui lòng đảm bảo file tồn tại hoặc đã chạy encrypt_config.py"
+    )
 
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-CREDENTIALS_FILE = 'credentials.json'
 SHEET_ID = '1nnFBZkEYtnhvQuiKDr94__hRNaNIb3JsAXyFqJTl8WE'
 
 SHEET_NAME = 'Lịch làm việc'
@@ -165,9 +205,9 @@ def sync_one_range(
                     can_bo_id = find_can_bo_by_name(ho_ten)
                     
                     if can_bo_id:
-                        print(f" Tìm thấy cán bộ ID: {can_bo_id}")
+                        print(f"✓ Tìm thấy cán bộ ID: {can_bo_id}")
                     else:
-                        print(f" Không tìm thấy cán bộ trong DB")
+                        print(f"✗ Không tìm thấy cán bộ trong DB")
                     
                     existing = supabase.table('lich_truc')\
                         .select('id, trang_thai')\
@@ -197,20 +237,20 @@ def sync_one_range(
                                 .update(data)\
                                 .eq('id', record['id'])\
                                 .execute()
-                            print(f"Updated existing record (ID: {record['id']})")
+                            print(f"✓ Updated existing record (ID: {record['id']})")
                         else:
-                            print(f"Skip: Trạng thái '{record['trang_thai']}' không cho phép update")
+                            print(f"⊘ Skip: Trạng thái '{record['trang_thai']}' không cho phép update")
                     else:
                         data['trang_thai'] = 'Đã đăng ký'
                         data['created_at'] = datetime.now().isoformat()
                         supabase.table('lich_truc').insert(data).execute()
-                        print(f"Inserted new record")
+                        print(f"✓ Inserted new record")
                     
                     success_count += 1
                 
                 except Exception as e:
                     error_msg = str(e)
-                    print(f"Error: {error_msg}")
+                    print(f"✗ Error: {error_msg}")
                     error_count += 1
                     errors.append(f"{cell_addr} ({ngay_truc.strftime('%d/%m')}): {error_msg}")
         
@@ -219,7 +259,7 @@ def sync_one_range(
     
     except Exception as e:
         error_msg = f"Lỗi đọc range {range_name}: {str(e)}"
-        print(f"{error_msg}")
+        print(f"✗ {error_msg}")
         return (0, 1, [error_msg])
 
 
@@ -232,10 +272,16 @@ def sync_full_week() -> Dict:
     print(f"{'='*60}")
     
     try:
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+        # Lấy credentials file (encrypted hoặc plain)
+        credentials_file = get_credentials_file()
+        
+        # Tạo credentials từ file
+        creds = Credentials.from_service_account_file(credentials_file, scopes=SCOPES)
         service = build('sheets', 'v4', credentials=creds)
         
-        print(f"\nĐọc ngày từ sheet...")
+        print(f"\n✓ Đã kết nối Google Sheets API")
+        print(f"Đọc ngày từ sheet...")
+        
         date_result = service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
             range=RANGE_DATES
@@ -251,12 +297,12 @@ def sync_full_week() -> Dict:
             if parsed_date:
                 dates.append(parsed_date)
             else:
-                print(f"Không parse được ngày: '{date_str}'")
+                print(f"✗ Không parse được ngày: '{date_str}'")
         
         if len(dates) != 5:
             raise ValueError(f"Không đủ 5 ngày hợp lệ. Chỉ parse được {len(dates)} ngày: {date_values[:5]}")
         
-        print(f"Đã parse 5 ngày:")
+        print(f"✓ Đã parse 5 ngày:")
         for i, d in enumerate(dates):
             weekday = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"][d.weekday()]
             print(f"  - {weekday}: {d.strftime('%d/%m/%Y')}")
@@ -302,9 +348,9 @@ def sync_full_week() -> Dict:
                 'thoi_gian_xu_ly': int(duration),
                 'log_chi_tiet': f'Sáng: {success_sang}/{error_sang}, Chiều: {success_chieu}/{error_chieu}'
             }).execute()
-            print("Đã log kết quả vào database")
+            print("✓ Đã log kết quả vào database")
         except Exception as log_error:
-            print(f"Không thể log vào DB: {log_error}")
+            print(f"✗ Không thể log vào DB: {log_error}")
         
         return {
             'success': total_errors == 0,
@@ -317,12 +363,31 @@ def sync_full_week() -> Dict:
             'week_range': f"{dates[0].strftime('%d/%m')} - {dates[-1].strftime('%d/%m/%Y')}"
         }
     
+    except FileNotFoundError as e:
+        error_msg = str(e)
+        duration = (datetime.now() - start_time).total_seconds()
+        
+        print(f"\n{'='*60}")
+        print(f"✗ LỖI: Không tìm thấy credentials")
+        print(f"Chi tiết: {error_msg}")
+        print(f"{'='*60}\n")
+        
+        return {
+            'success': False,
+            'sang': {'success': 0, 'errors': 0},
+            'chieu': {'success': 0, 'errors': 0},
+            'total_success': 0,
+            'total_errors': 1,
+            'error_details': [error_msg],
+            'duration': duration
+        }
+    
     except Exception as e:
         error_msg = str(e)
         duration = (datetime.now() - start_time).total_seconds()
         
         print(f"\n{'='*60}")
-        print(f"LỖI NGHIÊM TRỌNG: {error_msg}")
+        print(f"✗ LỖI NGHIÊM TRỌNG: {error_msg}")
         print(f"{'='*60}\n")
         
         return {
