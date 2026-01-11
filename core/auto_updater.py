@@ -89,25 +89,44 @@ class AutoUpdater:
         return result
     
     def download_update(self, download_url: str, progress_callback=None) -> str:
+        """Tải file với tối ưu tốc độ"""
         temp_dir = tempfile.gettempdir()
         filename = download_url.split('/')[-1]
         filepath = os.path.join(temp_dir, filename)
         
-        response = requests.get(download_url, stream=True)
+        # Tăng chunk size lên 1MB để giảm overhead
+        CHUNK_SIZE = 1024 * 1024  # 1MB
+        
+        # Sử dụng session với connection pooling
+        session = requests.Session()
+        
+        # Config timeout hợp lý
+        response = session.get(download_url, stream=True, timeout=(10, 30))
         response.raise_for_status()
         
         total_size = int(response.headers.get('content-length', 0))
         downloaded = 0
+        last_update_size = 0  # Track khi nào update UI
+        
+        # Chỉ update UI mỗi 2% hoặc mỗi 2MB
+        update_threshold = max(total_size * 0.02, 2 * 1024 * 1024)
+        
+        # ✅ Gọi callback ngay lần đầu để hiển thị progress bar
+        if progress_callback:
+            progress_callback(0, total_size)
         
         with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
                     
-                    if progress_callback:
+                    # Chỉ update UI khi đạt ngưỡng
+                    if progress_callback and (downloaded - last_update_size >= update_threshold or downloaded >= total_size):
                         progress_callback(downloaded, total_size)
+                        last_update_size = downloaded
         
+        session.close()
         return filepath
     
     def install_update(self, installer_path: str):
@@ -163,7 +182,7 @@ class UpdateDialog:
                 ft.Row([
                     CustomIcon.create(CustomIcon.INFO, size=16),
                     ft.Text(
-                        "Tính năng mới:",
+                        "✨ Tính năng mới:",
                         size=14,
                         weight=ft.FontWeight.BOLD,
                         color=ft.Colors.GREY_900
@@ -225,7 +244,7 @@ class UpdateDialog:
             ),
      
             ft.Text(
-                "Đã có bản cập nhật mới!",
+                "🎉 Đã có bản cập nhật mới!",
                 size=24,
                 weight=ft.FontWeight.BOLD,
                 color=ft.Colors.BLACK,
@@ -329,10 +348,12 @@ class UpdateDialog:
 
         self.download_progress['bar'].visible = True
         self.download_progress['text'].visible = True
+        self.download_progress['text'].value = "Đang chuẩn bị tải xuống..."
         self.page.update()
         
         def download_thread():
             try:
+                # Callback được gọi ít hơn nhiều nhờ threshold trong download_update
                 def progress_callback(downloaded, total):
                     progress = downloaded / total if total > 0 else 0
                     self.download_progress['bar'].value = progress
@@ -340,15 +361,24 @@ class UpdateDialog:
                     self.page.update()
                 
                 installer_path = self.updater.download_update(download_url, progress_callback)
-                self.page.run_task(lambda: self._show_install_button(dialog, installer_path))
+                
+                # ✅ Sử dụng async wrapper
+                async def show_install():
+                    self._show_install_button(dialog, installer_path)
+                
+                self.page.run_task(show_install)
                 
             except Exception as ex:
-                self.page.run_task(lambda: self._show_download_error(dialog, str(ex)))
+                # ✅ Sử dụng async wrapper
+                async def show_error():
+                    self._show_download_error(dialog, str(ex))
+                
+                self.page.run_task(show_error)
         
         threading.Thread(target=download_thread, daemon=True).start()
     
     def _show_install_button(self, dialog: ft.AlertDialog, installer_path: str):    
-        self.download_progress['text'].value = "Tải xuống hoàn tất!"
+        self.download_progress['text'].value = "✅ Tải xuống hoàn tất!"
         self.download_progress['text'].color = ft.Colors.GREEN_700
         self.download_progress['text'].weight = ft.FontWeight.BOLD
         

@@ -1,66 +1,60 @@
 # ===============================
-# Python / Flet
+# SECRETS / CREDENTIALS - CỰC KỲ QUAN TRỌNG
+# ===============================
+credentials.json
+user_credentials.json
+.env
+.env.*
+!.env.example
+.env.encrypted
+credentials.json.encrypted
+
+# ===============================
+# PYTHON / FLET
 # ===============================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.log
-
-# Virtual environment
 venv/
 .env/
-.env.*
-!.env.example
-.env
 
 # ===============================
-# Secrets / Credentials (CỰC KỲ QUAN TRỌNG)
-# ===============================
-credentials.json
-user_credentials.json
-.env.encrypted
-credentials.json.encrypted
-
-# ===============================
-# Build / Package output
+# BUILD / PACKAGE OUTPUT
 # ===============================
 build/
 dist/
 installer_output/
-
 *.spec
 *.iss
 
 # ===============================
-# OS / Editor
-# ===============================
-.DS_Store
-Thumbs.db
-
-.vscode/
-.idea/
-
-# ===============================
-# Runtime / App data
+# RUNTIME / APP DATA
 # ===============================
 *.db
 *.sqlite3
+*.tmp
+*.temp
+last_update_check.json
 
 # ===============================
-# Logs
+# LOGS
 # ===============================
 logs/
 *.log
 
 # ===============================
-# Auto updater / temp
+# OS / EDITOR
 # ===============================
-*.tmp
-*.temp
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
+# ===============================
+# PROJECT SPECIFIC
+# ===============================
 build.ps1
-
 pyproject.toml
-
-last_update_check.json
+INFO.txt
+LICENSE.txt
