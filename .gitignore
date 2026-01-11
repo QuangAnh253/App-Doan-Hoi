@@ -27,6 +27,7 @@ dist/
 installer_output/
 *.spec
 *.iss
+Vietnamese.isl
 
 # ===============================
 # RUNTIME / APP DATA
